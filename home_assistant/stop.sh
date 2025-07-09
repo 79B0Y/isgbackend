@@ -8,7 +8,7 @@ SERVICE_ID="home_assistant"
 FLAG_FILE="/data/data/com.termux/files/home/services/$SERVICE_ID/.disabled"
 LOG_DIR="/sdcard/isgbackup/ha"
 LOG_FILE="$LOG_DIR/stop_$(date +'%Y%m%d-%H%M%S').log"
-MQTT_TOPIC="$SERVICE_ID/status"
+MQTT_TOPIC="isg/services/$SERVICE_ID/status"
 
 # 从配置文件中读取 MQTT 参数
 CONFIG_FILE="/data/data/com.termux/files/home/services/configuration.yaml"
