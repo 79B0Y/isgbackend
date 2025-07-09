@@ -1,0 +1,7 @@
+current: 1.0.0
+history:
+  - version: 1.0.0
+    date: 2025-07-10
+    author: BO
+    changes:
+      - 初始脚本套件：install / start / stop / backup / restore / update / autocheck
