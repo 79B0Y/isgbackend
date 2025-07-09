@@ -1,80 +1,98 @@
 #!/usr/bin/env python3
 """
-Home Assistant 监控 / MQTT 上报脚本
-保存路径：/data/data/com.termux/files/home/services/home_assistant/monitor.py
+Generic MQTT monitor helper
+---------------------------
+- Publishes status payloads for service scripts (install.sh, backup.sh, etc.)
+- Optionally subscribes & prints a topic (diagnostic)
 
-用法示例：
-    python3 monitor.py --status running --pid 22104
-    python3 monitor.py --status backup_success --extra '{"file":"/sdcard/...tar.gz"}'
+Design principles
+* **Single responsibility**: 只处理 MQTT 连接、发布、订阅，不做业务逻辑判断
+* **Environment‑driven**: broker 地址、端口、凭证均可通过环境变量覆盖
+* **CLI‑friendly**: 通过命令行参数决定 publish / subscribe 动作
 
-脚本特性：
-- 读取环境变量以获取 MQTT 参数；全部有默认值，方便离线测试。
-- `--service` 可覆盖服务 ID，默认 `home_assistant`（因此本脚本也可被其他服务复用）。
-- `--status` 必填；`--pid` 与 `--extra` 选填。
-- 以 QoS 1 + retain 发布到 `isg/status/<service>`。
+Usage examples
+--------------
+Publish:
+    python3 monitor.py --service home_assistant --status running --extra '{"duration":12}'
+
+Subscribe (print retained payload then exit):
+    python3 monitor.py --subscribe isg/status/home_assistant
 """
-import argparse
-import json
-import os
-import sys
-import time
-from pathlib import Path
+import json, os, sys, time, argparse
+from typing import Optional
 
 try:
-    import paho.mqtt.client as mqtt
+    import paho.mqtt.client as mqtt  # type: ignore
 except ImportError:
-    print("[ERROR] 未安装 paho-mqtt，请先执行: pip install paho-mqtt", file=sys.stderr)
+    print("[monitor.py] paho-mqtt not installed", file=sys.stderr)
     sys.exit(1)
 
-# ------------------------ 环境变量 ------------------------
-MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
-MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
-MQTT_USER = os.environ.get("MQTT_USER", "admin")
-MQTT_PASS = os.environ.get("MQTT_PASS", "admin")
-MQTT_QOS = int(os.environ.get("MQTT_QOS", 1))
-TOPIC_PREFIX = os.environ.get("TOPIC_PREFIX", "isg/status")
+# ---------------- MQTT connection params ----------------
+BROKER_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
+BROKER_PORT = int(os.getenv("MQTT_PORT", "1883"))
+BROKER_USER = os.getenv("MQTT_USER", "admin")
+BROKER_PASS = os.getenv("MQTT_PASS", "admin")
+KEEPALIVE   = int(os.getenv("MQTT_KEEPALIVE", "5"))
+CLIENT_ID   = os.getenv("MQTT_CLIENT_ID", f"svc-monitor-{int(time.time())}")
 
-# ------------------------ CLI 解析 ------------------------
-parser = argparse.ArgumentParser(description="Publish Home Assistant runtime status via MQTT")
-parser.add_argument("--service", default="home_assistant", help="service_id，默认 home_assistant")
-parser.add_argument("--status", required=True, help="状态码，例如 running / stopped / backup_success 等")
-parser.add_argument("--pid", type=int, help="进程 PID，可选")
-parser.add_argument("--extra", help="额外 JSON 字符串，可选")
+# ---------------- CLI ----------------
+parser = argparse.ArgumentParser(description="MQTT monitor helper (publish / subscribe)")
+parser.add_argument("--service", help="service_id (for publish mode)")
+parser.add_argument("--status",  help="status string (publish mode)")
+parser.add_argument("--extra",   help="extra JSON (publish mode)")
+parser.add_argument("--topic",   help="explicit publish topic (override default)")
+parser.add_argument("--subscribe", metavar="TOPIC", help="subscribe a topic and output retained payload then exit")
+parser.add_argument("--retain", action="store_true", help="flag: retain message when publishing (default true)")
+parser.add_argument("--qos", type=int, default=0, choices=[0,1,2], help="mqtt qos level (default 0)")
 args = parser.parse_args()
 
-# ------------------------ 组装 Payload -------------------
+# ---------------- Connect helper ----------------
+
+def connect_mqtt() -> mqtt.Client:
+    client = mqtt.Client(CLIENT_ID)
+    if BROKER_USER or BROKER_PASS:
+        client.username_pw_set(BROKER_USER, BROKER_PASS)
+    client.connect(BROKER_HOST, BROKER_PORT, KEEPALIVE)
+    return client
+
+# ---------------- Subscribe mode ----------------
+if args.subscribe:
+    topic = args.subscribe
+    payload_holder: dict[str, Optional[str]] = {"msg": None}
+
+    def on_message(_cli, _ud, msg):
+        payload_holder["msg"] = msg.payload.decode() if msg.payload else ""
+        print(payload_holder["msg"])
+        _cli.disconnect()
+
+    cli = connect_mqtt()
+    cli.on_message = on_message
+    cli.subscribe(topic, qos=args.qos)
+    cli.loop_start()
+    # wait max 3 seconds for retained
+    time.sleep(3)
+    cli.loop_stop()
+    sys.exit(0)
+
+# ---------------- Publish mode ----------------
+if not (args.service and args.status):
+    parser.error("--service and --status are required for publish mode (unless --subscribe)")
+
+try:
+    extra_data = json.loads(args.extra) if args.extra else {}
+except json.JSONDecodeError as e:
+    print(f"[monitor.py] extra JSON decode error: {e}", file=sys.stderr)
+    sys.exit(1)
+
 payload = {
     "service": args.service,
     "status": args.status,
     "timestamp": int(time.time())
 }
+payload.update(extra_data)
 
-# 读取脚本版本（同目录 VERSION 文件）
-version_file = Path(__file__).resolve().parent / "VERSION"
-if version_file.exists():
-    payload["script_version"] = version_file.read_text().strip()
+publish_topic = args.topic or f"isg/status/{args.service}"
 
-if args.pid:
-    payload["pid"] = args.pid
-
-if args.extra:
-    try:
-        extra_dict = json.loads(args.extra)
-        payload.update(extra_dict)
-    except json.JSONDecodeError:
-        payload["extra_raw"] = args.extra  # 解析失败时以原字符串附加
-
-# ------------------------ MQTT 发布 ----------------------
-client = mqtt.Client(client_id=f"monitor-{args.service}-{os.getpid()}")
-client.username_pw_set(MQTT_USER, MQTT_PASS)
-try:
-    client.connect(MQTT_HOST, MQTT_PORT, 10)
-except Exception as e:
-    print(f"[ERROR] 无法连接 MQTT Broker: {e}", file=sys.stderr)
-    sys.exit(1)
-
-topic = f"{TOPIC_PREFIX}/{args.service}"
-client.publish(topic, json.dumps(payload, ensure_ascii=False), qos=MQTT_QOS, retain=True)
-client.disconnect()
-
-print(f"[INFO] Published to {topic}: {payload}")
+cli = connect_mqtt()
+cli.publish(publish_topic, json.dumps(payload), qos=args.qos, retain=True)
+cli.disconnect()
