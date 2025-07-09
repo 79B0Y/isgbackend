@@ -1,4 +1,4 @@
-# isgbackend# LinknLink 嵌入式服务全生命周期管理设计说明
+# LinknLink 嵌入式服务全生命周期管理设计说明
 
 ## 1 概述
 
@@ -48,6 +48,23 @@
 
 服务 = 任何需要长期运行及健康监控的进程，例如 Home Assistant、BLE Gateway。
 
+#### 2.2.1 service\_id 命名规范
+
+* **全小写**，仅使用字母、数字和下划线 (`[a-z0-9_]+`)。
+* **必须以字母开头**，避免与数字目录混淆。
+* **语义清晰**：能直观反映服务名称或功能（如 `home_assistant`、`ble_gateway`）。
+* **全局唯一**：在同一注册表文件 `registry.json` 中不得重复。
+* **稳定不变**：一旦发布，不因版本升级而修改；目录名、MQTT 主题、备份路径等均依赖该 ID。
+* **文件系统安全**：不含空格、特殊字符，长度 ≤ 32 字符。
+
+> **注意**：`service_id` 会直接用作以下位置：
+>
+> 1. 本地目录 `/opt/services/<service_id>/`
+> 2. MQTT 主题 `isg/status/<service_id>`
+> 3. 注册表字段 `"id"`、脚本包前缀 `<service_id>-scripts-<ver>.tar.gz`
+>
+> 因此请保持简洁、可预测且一次性定好。
+
 ### 2.3 目录布局
 
 ```
@@ -71,6 +88,13 @@
 ## 3 云端组件
 
 ### 3.1 注册表 `registry.json`
+
+> **存放位置（isgbackend 项目）**
+>
+> * 如果 isgbackend 使用前后端同仓库结构，建议放在 **`public/registry/registry.json`**，通过 Nginx/Gin 等静态文件路由直接暴露为 `https://<domain>/registry/registry.json`。
+> * 如果项目已存在 `static/` 目录（例如 React/Vite 前端资源），亦可放在 **`static/registry/registry.json`**。
+> * 无论放哪，都要保证 **CI/CD 或 GitHub Actions** 在推送时同步上传最新文件至 CDN。
+> * 目录应仅包含只读静态文件，避免与后端 API 代码混杂，便于缓存与权限控制。
 
 ```json
 {
