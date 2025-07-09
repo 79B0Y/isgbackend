@@ -1,103 +1,80 @@
 #!/usr/bin/env python3
 """
-monitor.py
-===========
-统一的 MQTT 上报道具 + Topic 状态检测工具
-调用方式：
- 1) 上报状态
-    python3 monitor.py --status running --extra '{"pid":123}'
+Home Assistant 监控 / MQTT 上报脚本
+保存路径：/data/data/com.termux/files/home/services/home_assistant/monitor.py
 
- 2) 等待指定 Topic 收到 "online" 字符串（status.sh 调用）
-    python3 monitor.py --check_topic_online homeassistant/status --timeout 60
+用法示例：
+    python3 monitor.py --status running --pid 22104
+    python3 monitor.py --status backup_success --extra '{"file":"/sdcard/...tar.gz"}'
+
+脚本特性：
+- 读取环境变量以获取 MQTT 参数；全部有默认值，方便离线测试。
+- `--service` 可覆盖服务 ID，默认 `home_assistant`（因此本脚本也可被其他服务复用）。
+- `--status` 必填；`--pid` 与 `--extra` 选填。
+- 以 QoS 1 + retain 发布到 `isg/status/<service>`。
 """
 import argparse
 import json
+import os
 import sys
 import time
+from pathlib import Path
 
-from paho.mqtt import client as mqtt_client
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    print("[ERROR] 未安装 paho-mqtt，请先执行: pip install paho-mqtt", file=sys.stderr)
+    sys.exit(1)
 
-# 默认 MQTT 参数，可被环境变量覆盖
-import os
-MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_USER = os.getenv("MQTT_USER", "admin")
-MQTT_PASS = os.getenv("MQTT_PASS", "admin")
-TOPIC_PREFIX = os.getenv("MQTT_TOPIC_PREFIX", "isg/status")
+# ------------------------ 环境变量 ------------------------
+MQTT_HOST = os.environ.get("MQTT_HOST", "127.0.0.1")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
+MQTT_USER = os.environ.get("MQTT_USER", "admin")
+MQTT_PASS = os.environ.get("MQTT_PASS", "admin")
+MQTT_QOS = int(os.environ.get("MQTT_QOS", 1))
+TOPIC_PREFIX = os.environ.get("TOPIC_PREFIX", "isg/status")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--status", help="status tag to publish (running/stopped/etc)")
-parser.add_argument("--pid", type=int, help="process id")
-parser.add_argument("--extra", help="extra JSON payload")
-parser.add_argument("--service", default="home_assistant", help="service id")
-
-# 用于 status.sh 调用的在线检测
-parser.add_argument("--check_topic_online", help="topic to wait for 'online' payload")
-parser.add_argument("--timeout", type=int, default=60, help="wait seconds")
-
+# ------------------------ CLI 解析 ------------------------
+parser = argparse.ArgumentParser(description="Publish Home Assistant runtime status via MQTT")
+parser.add_argument("--service", default="home_assistant", help="service_id，默认 home_assistant")
+parser.add_argument("--status", required=True, help="状态码，例如 running / stopped / backup_success 等")
+parser.add_argument("--pid", type=int, help="进程 PID，可选")
+parser.add_argument("--extra", help="额外 JSON 字符串，可选")
 args = parser.parse_args()
 
-# --- MQTT 连接助手 ---
+# ------------------------ 组装 Payload -------------------
+payload = {
+    "service": args.service,
+    "status": args.status,
+    "timestamp": int(time.time())
+}
 
-def connect() -> mqtt_client.Client:
-    client = mqtt_client.Client(f"monitor-{int(time.time()*1000)%100000}")
-    if MQTT_USER:
-        client.username_pw_set(MQTT_USER, MQTT_PASS)
-    client.connect(MQTT_HOST, MQTT_PORT, keepalive=20)
-    return client
+# 读取脚本版本（同目录 VERSION 文件）
+version_file = Path(__file__).resolve().parent / "VERSION"
+if version_file.exists():
+    payload["script_version"] = version_file.read_text().strip()
 
-# --- 功能 A：发布状态 ---
-if args.status:
-    payload = {
-        "service": args.service,
-        "status": args.status,
-        "timestamp": int(time.time())
-    }
-    if args.pid:
-        payload["pid"] = args.pid
-    if args.extra:
-        try:
-            payload.update(json.loads(args.extra))
-        except json.JSONDecodeError:
-            payload["extra"] = args.extra
-    topic = f"{TOPIC_PREFIX}/{args.service}"
+if args.pid:
+    payload["pid"] = args.pid
 
-    cli = connect()
-    cli.publish(topic, json.dumps(payload), retain=True)
-    cli.disconnect()
-    sys.exit(0)
-
-# --- 功能 B：等待 Topic online ---
-if args.check_topic_online:
-    topic = args.check_topic_online
-    received = {
-        "flag": False
-    }
-
-    def on_message(_cli, _ud, msg):
-        if msg.payload.decode() == "online":
-            received["flag"] = True
-            _cli.disconnect()
-
-    cli = connect()
-    cli.on_message = on_message
-    cli.subscribe(topic, qos=0)
-
-    start = time.time()
-    cli.loop_start()
+if args.extra:
     try:
-        while time.time() - start < args.timeout:
-            if received["flag"]:
-                cli.loop_stop()
-                sys.exit(0)
-            time.sleep(0.2)
-        cli.loop_stop()
-        sys.exit(1)  # 超时未收到 online
-    except KeyboardInterrupt:
-        cli.loop_stop()
-        sys.exit(1)
+        extra_dict = json.loads(args.extra)
+        payload.update(extra_dict)
+    except json.JSONDecodeError:
+        payload["extra_raw"] = args.extra  # 解析失败时以原字符串附加
 
-# 若未匹配任何功能
-parser.print_help()
-sys.exit(1)
+# ------------------------ MQTT 发布 ----------------------
+client = mqtt.Client(client_id=f"monitor-{args.service}-{os.getpid()}")
+client.username_pw_set(MQTT_USER, MQTT_PASS)
+try:
+    client.connect(MQTT_HOST, MQTT_PORT, 10)
+except Exception as e:
+    print(f"[ERROR] 无法连接 MQTT Broker: {e}", file=sys.stderr)
+    sys.exit(1)
 
+topic = f"{TOPIC_PREFIX}/{args.service}"
+client.publish(topic, json.dumps(payload, ensure_ascii=False), qos=MQTT_QOS, retain=True)
+client.disconnect()
+
+print(f"[INFO] Published to {topic}: {payload}")
