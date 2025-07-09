@@ -3,77 +3,92 @@
 # Home Assistant 运行状态检查脚本（进程 + 端口 + MQTT Online）
 # 保存路径：/data/data/com.termux/files/home/services/home_assistant/status.sh
 # ------------------------------------------------------------
-# 逻辑：
-#   1) 进程是否存在（PID / pgrep）
-#   2) 8123 端口是否可达
-#   3) MQTT Topic `homeassistant/status` 是否为 online（读取保留消息）
+# 检测逻辑：
+#   1) 进程是否存在（pgrep）
+#   2) 8123 端口是否可连接（127.0.0.1）
+#   3) MQTT 保留消息 `homeassistant/status` 是否为 "online"
 #
-# 输出 / 返回值：
-#   running  → exit 0  （全部 OK）
-#   starting → exit 2  （进程 OK，但端口或 MQTT 未就绪）
-#   stopped  → exit 1  （服务未安装或进程不存在）
+# 输出 / 退出码：
+#   running  → exit 0   # 全部 OK
+#   starting → exit 2   # 进程 OK，但端口或 MQTT 未就绪
+#   stopped  → exit 1   # 未安装或进程不存在
+#
+# 选项：
+#   --json   输出 JSON
+#   --quiet  静默，只返回退出码
 # ------------------------------------------------------------
 set -euo pipefail
 
 SERVICE_ID="home_assistant"
-PROOT_DISTRO="${PROOT_DISTRO:-ubuntu}"
-PID_FILE="/var/run/${SERVICE_ID}.pid"
+PORT=8123
 
-# 关键可执行文件（容器内）
-HA_MAIN="${HA_MAIN:-/usr/local/bin/hass}"
-HA_PORT="${HA_PORT:-8123}"
-
-# MQTT 参数（与 monitor.py / 环境变量保持一致）
+# MQTT 连接参数（可通过环境变量覆盖）
 MQTT_HOST="${MQTT_HOST:-127.0.0.1}"
 MQTT_PORT="${MQTT_PORT:-1883}"
 MQTT_USER="${MQTT_USER:-admin}"
 MQTT_PASS="${MQTT_PASS:-admin}"
 MQTT_TOPIC="homeassistant/status"
+MQTT_TIMEOUT=3   # 秒
 
-in_proot() { proot-distro exec "$PROOT_DISTRO" -- "$@"; }
+VERSION_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/VERSION"
 
-# ------------------------------------------------------------
-# 1. 安装 & 进程检查
-# ------------------------------------------------------------
-if ! in_proot test -x "$HA_MAIN"; then
-  echo "stopped"; exit 1
-fi
+status="stopped"
+code=1
+pid="null"
 
-PROC_OK=0
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat "$PID_FILE"); if ps -p "$PID" > /dev/null 2>&1; then PROC_OK=1; fi
-fi
-if [ "$PROC_OK" -eq 0 ] && pgrep -f "[h]ass" > /dev/null 2>&1; then PROC_OK=1; fi
-[ "$PROC_OK" -eq 0 ] && { echo "stopped"; exit 1; }
-
-# ------------------------------------------------------------
-# 2. 端口检查
-# ------------------------------------------------------------
-PORT_OK=0
-if command -v nc >/dev/null 2>&1; then
-  nc -z 127.0.0.1 "$HA_PORT" && PORT_OK=1
+# 1) 是否安装（存在 VERSION 文件即可视作已安装脚本）
+if [[ ! -f "$VERSION_FILE" ]]; then
+    status="stopped"; code=1
 else
-  curl -fsS --max-time 2 "http://127.0.0.1:${HA_PORT}/" >/dev/null 2>&1 && PORT_OK=1
+    # 2) 检查进程（匹配 hass 或 homeassistant）
+    if pid=$(pgrep -f "[h]omeassistant" | head -n1); then
+        # 3) 检查端口
+        if nc -z -w2 127.0.0.1 "$PORT" 2>/dev/null; then
+            # 4) 检查 MQTT online
+            online=$(python3 - <<PY 2>/dev/null || echo "error")
+import paho.mqtt.client as m, time, sys
+msg="error"
+
+def on_message(cli,userdata,ms):
+    global msg
+    msg=ms.payload.decode() if ms.payload else ""
+    cli.disconnect()
+
+try:
+    cli=m.Client()
+    cli.username_pw_set("${MQTT_USER}", "${MQTT_PASS}")
+    cli.on_message=on_message
+    cli.connect("${MQTT_HOST}", ${MQTT_PORT}, ${MQTT_TIMEOUT})
+    cli.subscribe("${MQTT_TOPIC}")
+    cli.loop_start()
+    time.sleep(${MQTT_TIMEOUT})
+    cli.loop_stop()
+except Exception:
+    pass
+print(msg)
+PY)
+            if [[ "$online" == "online" ]]; then
+                status="running"; code=0
+            else
+                status="starting"; code=2
+            fi
+        else
+            status="starting"; code=2
+        fi
+    else
+        status="stopped"; code=1
+    fi
 fi
 
-# ------------------------------------------------------------
-# 3. MQTT Online 检测（可选）
-# ------------------------------------------------------------
-MQTT_OK=0
-if command -v mosquitto_sub >/dev/null 2>&1; then
-  MSG=$(mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" \
-                      -t "$MQTT_TOPIC" -C 1 -W 2 2>/dev/null || true)
-  [[ "$MSG" =~ online ]] && MQTT_OK=1
+# ---------- 输出 ----------
+if [[ "${1:-}" == "--quiet" ]]; then
+    exit $code
+fi
+
+if [[ "${1:-}" == "--json" ]]; then
+    printf '{"status":"%s","pid":%s}\n' "$status" "${pid}"
 else
-  MQTT_OK=1  # 未安装 mosquitto_sub 时跳过 MQTT 检测
+    echo "$status"
 fi
 
-# ------------------------------------------------------------
-# 4. 综合判定 & 输出
-# ------------------------------------------------------------
-if [ "$PORT_OK" -eq 1 ] && [ "$MQTT_OK" -eq 1 ]; then
-  echo "running"; exit 0
-else
-  echo "starting"; exit 2
-fi
-
+exit $code
