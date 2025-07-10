@@ -8,7 +8,7 @@ edr## Home Assistant 还原脚本说明 (`restore.sh`)
 > * 从 **最新备份** `homeassistant_backup_*.tar.gz` 还原 Home Assistant 配置；若无备份则使用 `homeassistant_original.tar.gz`。
 > * 自动停止服务 → 清空配置 → 解压备份 → 重启服务。
 > * 过程日志写入 `/sdcard/isgbackup/hass/restore_<时间>.log`。
-> * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/status `restoring` → `restore_success` / `restore_failed`。
+> * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/hass/status `restoring` → `restore_success` / `restore_failed`。
 > * 自动清理	保留最新 3 份备份与日志（可调）
 ---
 
