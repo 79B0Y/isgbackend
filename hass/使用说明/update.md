@@ -1,14 +1,14 @@
 ## Home Assistant 升级脚本使用说明 (`update.sh`)
 
 > **脚本路径**
-> `/data/data/com.termux/files/home/services/home_assistant/update.sh`
+> `/data/data/com.termux/files/home/servicemanager/hass/update.sh`
 
 > **脚本功能**
 >
 > * 将 `/root/homeassistant` 虚拟环境中的 Home Assistant 升级或降级到 **指定版本**。
 > * **版本号来源**：`TARGET_VERSION` 环境变量，或脚本第一个参数。
 > * 过程日志写入 `/sdcard/isgbackup/ha/update_<时间>.log`。
-> * 通过 `monitor.py` 上报 MQTT：`updating` → `update_success` / `update_failed`。
+> * 通过termux Mosquitto cli 上报 MQTT，主题：isg/update/hass/status `updating` → `success` / `failed`。
 
 ---
 
@@ -34,7 +34,7 @@
    pip install --upgrade --no-cache-dir homeassistant==<version>
    ```
 4. 调用 `start.sh` 重启服务并等待 `running` 确认。
-5. 上报 `update_success`（或 `update_failed`）。
+5. 上报 `success`（或 `update_failed`）。
 
 ---
 
@@ -53,9 +53,9 @@ TARGET_VERSION=2025.5.0 bash update.sh
 ```json
 {
   "service":"home_assistant",
-  "status":"update_success",
+  "status":"success",
   "version":"2025.6.1",
-  "log":"/sdcard/isgbackup/ha/update_20250710-022500.log",
+  "log":"/sdcard/isgbackup/hass/update_20250710-022500.log",
   "timestamp":1720574500
 }
 ```
@@ -67,7 +67,7 @@ TARGET_VERSION=2025.5.0 bash update.sh
 | 变量               | 默认值                    | 说明                        |
 | ---------------- | ---------------------- | ------------------------- |
 | `PROOT_DISTRO`   | `ubuntu`               | 容器名 (`proot-distro list`) |
-| `BACKUP_DIR`     | `/sdcard/isgbackup/ha` | 日志存放目录                    |
+| `BACKUP_DIR`     | `/sdcard/isgbackup/hass` | 日志存放目录                    |
 | `TARGET_VERSION` | *(无)*                  | 目标版本号（SemVer）             |
 
 ---
