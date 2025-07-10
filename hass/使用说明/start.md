@@ -25,7 +25,7 @@
 调用成功示例输出：
 
 ```
-[INFO] hass 已后台启动，日志写入 /sdcard/isgbackup/ha/hass_runtime.log
+[INFO] hass 已后台启动，日志写入 /sdcard/isgbackup/hass/hass_runtime.log
 [OK] Home Assistant 正常运行
 ```
 
