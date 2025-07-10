@@ -21,7 +21,7 @@
 | 优化压缩        | 安装 `zlib-ng isal` 源码版，提高 zlib 性能                                               |
 | 配置补丁        | `configuration.yaml` 添加 `logger: critical` 与 `http.use_x_frame_options: false` |
 | 完成上报        | MQTT `success`，payload 包含版本号与日志路径                                      |
-
+MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 ---
 
 
