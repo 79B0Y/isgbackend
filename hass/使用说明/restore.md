@@ -10,6 +10,7 @@ edr## Home Assistant 还原脚本说明 (`restore.sh`)
 > * 过程日志写入 `/sdcard/isgbackup/hass/restore_<时间>.log`。
 > * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/hass/status `restoring` → `success` / `failed`。
 > * 自动清理	保留最新 3 份备份与日志（可调）
+> * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 ---
 
 ### 1. 备份选择逻辑
