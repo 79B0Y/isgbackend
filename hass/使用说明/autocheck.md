@@ -10,6 +10,7 @@
 > * **参数化**：失败阈值与版本检查间隔全部通过环境变量配置。
 > * **MQTT**：实时上报 `running / recovered / failed / permanent_failed / disabled / config` 等状态，供前端可视化。
 > * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
+> * 如果状态不是running, 没有disable标志，先尝试启动homesistant，尝试3次都无法启动，尝试安装home assistant
 
 ---
 
