@@ -1,7 +1,7 @@
 ## Home Assistant 备份脚本使用说明 (`backup.sh`)
 
 > **脚本路径**
-> `/data/data/com.termux/files/home/services/home_assistant/backup.sh`
+> `/data/data/com.termux/files/home/servicemanager/hass/backup.sh`
 
 > **适用环境**
 >
