@@ -17,7 +17,7 @@
 | ①  | 检查运行状态    | 调用 `status.sh`，只有服务处于 `running` 时才继续备份                       |
 | ②  | 进入容器打包    | 通过 `in_proot()` 执行 `tar -czf`，压缩 `/root/.homeassistant` 全量文件，存入/sdcard/isgbackup/hass/ |
 | ③  | 日志   | 所有输出写入独立日志，日志存入 存入/sdcard/isgbackup/hass/；                           |
-| ④  | MQTT      | 通过termux Mosquitto cli 上报 MQTT，主题：isg/backup/status `backuping` → `backup_success` / `backup_failed`。                                       |
+| ④  | MQTT      | 通过termux Mosquitto cli 上报 MQTT，主题：isg/backup/hass/status `backuping` → `backup_success` / `backup_failed`。                                       |
 | 5  | 自动清理      | 保留最新 **3** 份备份与日志（可调）                                        |
 
 备份文件示例：
