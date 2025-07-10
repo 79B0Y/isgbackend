@@ -29,8 +29,8 @@
 ┌────────────────────────────────────────────────────────────┐
 │   Rooted Android ▸ Termux ▸ Proot Ubuntu (Linux FS)       │
 │ ┌──────────────────────┐                                 │
-│ │ /opt/services/      │                                 │
-│ │  ├── home_assistant/│ autocheck.sh ▸ monitor.py  …   │
+│ │ /data/data/com.termux/files/home/servicemanager/      │                                 │
+│ │  ├── hass/│ autocheck.sh   …   │
 │ │  ├── zigbee2mqtt/   │                                 │
 │ │  ├── zwave_js_ui/   │                                 │
 │ │  ├── ble_gateway/…  │                                 │
@@ -52,23 +52,27 @@
 
 * **全小写**，仅使用字母、数字和下划线 (`[a-z0-9_]+`)。
 * **必须以字母开头**，避免与数字目录混淆。
-* **语义清晰**：能直观反映服务名称或功能（如 `home_assistant`、`ble_gateway`）。
+* **语义清晰**：能直观反映服务名称或功能（如 `hass`、`zigbee2mqtt`）。
 * **全局唯一**：在同一注册表文件 `registry.json` 中不得重复。
 * **稳定不变**：一旦发布，不因版本升级而修改；目录名、MQTT 主题、备份路径等均依赖该 ID。
 * **文件系统安全**：不含空格、特殊字符，长度 ≤ 32 字符。
 
 > **注意**：`service_id` 会直接用作以下位置：
 >
-> 1. 本地目录 `/opt/services/<service_id>/`
-> 2. MQTT 主题 `isg/status/<service_id>`
-> 3. 注册表字段 `"id"`、脚本包前缀 `<service_id>-scripts-<ver>.tar.gz`
->
-> 因此请保持简洁、可预测且一次性定好。
+> 1. 本地目录 `/data/data/com.termux/files/home/servicemanager/<service_id>/`
+> 2. MQTT 主题:
+     服务状态：isg/status/<service_id>/status
+     安装与卸载：isg/install/<service_id>/status
+     备份：isg/backup/<service_id>/status
+     还原：isg/restore/<service_id>/status
+     启停：isg/run/<service_id>/status
+     升级：isg/update/<service_id>/status
+     检查：isg/autocheck/<service_id>/status
 
 ### 2.3 目录布局
 
 ```
-/opt/services/
+/data/data/com.termux/files/home/servicemanager/
   <service_id>/
     install.sh      # 初次安装及依赖
     uninstall.sh    # 卸载清理
@@ -77,10 +81,10 @@
     update.sh       # 升级执行脚本（读取环境变量 VERSION/TARGET_VERSION，脚本本身不在线更新）
     autocheck.sh    # 健康检查+自愈入口
     VERSION         # 当前脚本包版本（SemVer）
-    monitor.py      # MQTT 上报器
   _downloads/       # 临时下载区
-  bootstrap_install.sh  # 按服务 id 引导安装脚本包
   autocheckall.sh   # 遍历所有已安装服务
+  configuration.yaml # 配置和更新isg MQTT broker 信息，还有其它配置信息
+  serviceupdate.sh  # 去云端拉去最新的servicelist.json,
 ```
 
 ---
@@ -88,14 +92,7 @@
 ## 3 云端组件
 
 ### 3.1 注册表 `registry.json`
-
-> **存放位置（isgbackend 项目）**
->
-> * 如果 isgbackend 使用前后端同仓库结构，建议放在 **`public/registry/registry.json`**，通过 Nginx/Gin 等静态文件路由直接暴露为 `https://<domain>/registry/registry.json`。
-> * 如果项目已存在 `static/` 目录（例如 React/Vite 前端资源），亦可放在 **`static/registry/registry.json`**。
-> * 无论放哪，都要保证 **CI/CD 或 GitHub Actions** 在推送时同步上传最新文件至 CDN。
-> * 目录应仅包含只读静态文件，避免与后端 API 代码混杂，便于缓存与权限控制。
-
+云端维护一个服务列表，JSON格式
 ```json
 {
   "generated": "2025-07-09T15:00:00Z",
@@ -104,20 +101,27 @@
       "id": "home_assistant",
       "display_name": "Home Assistant Core",
       "latest_version": "1.3.2",
-      "package_url": "https://dl.linknlink.com/services/ha-scripts-1.3.2.tar.gz",
+      "package_url": "https://dl.linknlink.com/services/hass-scripts-1.3.2.tar.gz",
       "package_sha256": "e4f41c7…"
     }
   ]
 }
 ```
+iSG应用程序定期执行/sdcard/isgbackup/servicelist/serviceupdate.sh，
+
+serviceupdate.sh功能
+下载将文件保存在 /sdcard/isgbackup/servicelist/servicelist.json 
+下载独立服务包保存在 /sdcard/isgbackup/servicelist/hass-scripts-1.3.2.tar.gz
+解压服务包到对应的目录下
 
 * **新增服务**：向数组追加一段并上传对应 tar 包。
 * **删除服务**：从数组移除即可，本地旧目录仍可运行或提示已弃用。
 
 ### 3.2 脚本包规范
 
-* 命名：`<id>-scripts-<version>.tar.gz`。
-* 解压后直接落在 `/opt/services/<id>/`，必须包含 `VERSION` 文件。
+* 命名：`<service_id>-scripts-<version>.tar.gz`。
+* 解压后直接落在 `/data/data/com.termux/files/home/servicemanager/<service_id>/`，必须包含 `VERSION` 文件。
+
 
 ### 3.3 发布与回滚
 
@@ -127,14 +131,6 @@
 ---
 
 ## 4 本地组件
-
-### 4.1 `bootstrap_install.sh`
-
-> 一键安装尚未存在的服务
-
-```bash
-bash /opt/services/bootstrap_install.sh ble_gateway
-```
 
 工作流程：读注册表 → 下载 → 校验 SHA‑256 → 解压 → 写 VERSION → 执行 `install.sh`。
 
@@ -154,20 +150,6 @@ bash /opt/services/bootstrap_install.sh ble_gateway
 3. 对每个已安装服务 `bash autocheck.sh`（内部带 `flock` 互斥）。
 4. 汇总版本并发布到 `isg/status/versions`。
 
-### 4.4 `monitor.py`
-
-统一的 MQTT 上报器，示例负载：
-
-```json
-{
-  "service": "home_assistant",
-  "status": "running",
-  "script_version": "1.3.2",
-  "pid": 22104,
-  "timestamp": 1720457910
-}
-```
-
 ---
 
 ## 5 版本与更新流程
@@ -178,38 +160,11 @@ bash /opt/services/bootstrap_install.sh ble_gateway
 | ② 下载包   | `curl -L` 保存至 `_downloads/`，校验 SHA‑256                    |
 | ③ 备份旧脚本 | 复制到 `release/<oldver>-时间戳`                                |
 | ④ 解压覆盖  | `tar -xzf … --strip-components=1`                         |
-| ⑤ 上报更新  | `monitor.py` 状态值 `updated`                                |
-
 > **说明：** `update.sh` 逻辑通用且稳定，**不会被在线替换**。若需同时升级“服务二进制（如 npm/pip 包）”，可在新的 `install.sh` 中检测并执行；实际目标版本由环境变量 `TARGET_VERSION`（或 `VERSION_OVERRIDE`）指定。
 
 ---
 
-## 6 MQTT 主题映射
-
-| 主题                    | Retain | 说明            |
-| --------------------- | ------ | ------------- |
-| `isg/status/<id>`     | ✅      | 单服务运行状态 JSON  |
-| `isg/status/versions` | ✅      | 所有已安装服务脚本版本汇总 |
-| `isg/log/<id>`        | ⬜      | 可选：最近日志片段     |
-
-默认 Broker：`tcp://127.0.0.1:1883`；可通过 `.env` 覆写。
-
----
-
-## 7 安卓 App 交互
-
-1. **基于密钥的 SSH** 登录 8022。
-2. 每 60 s 执行 `bash /opt/services/autocheckall.sh`。
-3. MQTT 订阅 → 渲染卡片（状态、版本、内存等）。
-4. 提供按钮：
-
-   * 安装新服务：`bootstrap_install.sh <id>`
-   * 备份 / 还原 / 手动更新
-   * 查看服务日志
-
----
-
-## 8 安全加固
+## 6 安全加固
 
 | 威胁        | 对策                                       |
 | --------- | ---------------------------------------- |
@@ -221,7 +176,7 @@ bash /opt/services/bootstrap_install.sh ble_gateway
 
 ---
 
-## 9 可靠性特性
+## 7 可靠性特性
 
 * **flock 互斥**：避免并发自检。
 * **cron/runit watchdog**：保证 `autocheckall.sh` 自身被定期调用。
@@ -229,24 +184,11 @@ bash /opt/services/bootstrap_install.sh ble_gateway
 
 ---
 
-## 10 新增服务流程
+## 8 新增服务流程
 
 1. 准备完整七脚本 + `VERSION`。
 2. 打包成 tar.gz 上传 CDN。
 3. 在 registry.json 追加记录。
-4. 设备刷新后用户 `bootstrap_install.sh <id>` 即可安装。
 
 ---
-
-## 11 词汇表
-
-| 术语    | 说明                                     |
-| ----- | -------------------------------------- |
-| 服务 ID | registry.json 中的唯一键，如 `home_assistant` |
-| 脚本包   | 包含生命周期脚本的压缩档                           |
-| 注册表   | 云端 JSON 索引文件                           |
-| 自愈    | 服务异常后自动恢复到运行状态                         |
-
----
-
 **文件结束**
