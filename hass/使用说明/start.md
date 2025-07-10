@@ -9,6 +9,7 @@
 > * 输出启动日志至 `/sdcard/isgbackup/hass/start_<时间>.log`，运行日志至 `hass_runtime.log`。
 > * 启动home assistant运行后，通过status.sh脚本查看服务是否在运行
 > * 通过termux Mosquitto cli 上报 MQTT，主题：isg/run/hass/status `starting` → `running` / `failed`。
+> * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 
 ---
 
