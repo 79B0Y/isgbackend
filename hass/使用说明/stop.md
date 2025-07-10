@@ -17,7 +17,7 @@
 | 阶段       | 说明                       | MQTT 上报                        |
 | -------- | ------------------------ | ------------------------------ |
 | stoping | 执行停止命令后立即发布              | `{status:"stoping"}`          |
-| stoped  | `status.sh` 连续检查成功       | `{status:"stoped"}`           |
+| stoped  | `status.sh` 连续检查成功       | `{status:"stopped"}`           |
 | failed   | 启动命令失败或 5 分钟内未达到 stoped | `{status:"failed", error:"…"}` |
 
 ---
