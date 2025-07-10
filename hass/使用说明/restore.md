@@ -1,15 +1,15 @@
-## Home Assistant 还原脚本使用说明 (`restore.sh`)
+edr## Home Assistant 还原脚本说明 (`restore.sh`)
 
 > **脚本路径**
-> `/data/data/com.termux/files/home/services/home_assistant/restore.sh`
+> `/data/data/com.termux/files/home/servicemanager/hass/restore.sh`
 
 > **脚本功能**
 >
 > * 从 **最新备份** `homeassistant_backup_*.tar.gz` 还原 Home Assistant 配置；若无备份则使用 `homeassistant_original.tar.gz`。
 > * 自动停止服务 → 清空配置 → 解压备份 → 重启服务。
-> * 过程日志写入 `/sdcard/isgbackup/ha/restore_<时间>.log`。
-> * 通过 `monitor.py` 上报 MQTT：`restoring` → `restore_success` / `restore_failed`。
-
+> * 过程日志写入 `/sdcard/isgbackup/hass/restore_<时间>.log`。
+> * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/status `restoring` → `restore_success` / `restore_failed`。
+> * 自动清理	保留最新 3 份备份与日志（可调）
 ---
 
 ### 1. 备份选择逻辑
@@ -29,15 +29,17 @@ bash restore.sh
 # 指定备份文件
 bash restore.sh homeassistant_backup_20250710-030000.tar.gz
 ```
+也可以指定不通名称格式的 ***.tar.gz
+
 
 成功 MQTT 示例：
 
 ```json
 {
-  "service":"home_assistant",
+  "service":"hass",
   "status":"restore_success",
-  "file":"/sdcard/isgbackup/ha/homeassistant_backup_20250710-030000.tar.gz",
-  "log":"/sdcard/isgbackup/ha/restore_20250710-031000.log",
+  "file":"/sdcard/isgbackup/hass/homeassistant_backup_20250710-030000.tar.gz",
+  "log":"/sdcard/isgbackup/hass/restore_20250710-031000.log",
   "timestamp":1720575060
 }
 ```
@@ -49,7 +51,7 @@ bash restore.sh homeassistant_backup_20250710-030000.tar.gz
 | 变量             | 默认值                    | 说明                         |
 | -------------- | ---------------------- | -------------------------- |
 | `PROOT_DISTRO` | `ubuntu`               | 容器名称 (`proot-distro list`) |
-| `BACKUP_DIR`   | `/sdcard/isgbackup/ha` | 备份与日志根目录                   |
+| `BACKUP_DIR`   | `/sdcard/isgbackup/hass` | 备份与日志根目录                   |
 
 ---
 
@@ -61,7 +63,7 @@ bash restore.sh homeassistant_backup_20250710-030000.tar.gz
 常用查看：
 
 ```bash
-tail -f /sdcard/isgbackup/ha/restore_*.log
+tail -f /sdcard/isgbackup/hass/restore_*.log
 ```
 
 ---
