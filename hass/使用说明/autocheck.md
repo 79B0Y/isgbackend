@@ -1,7 +1,7 @@
 ## Home Assistant 自检脚本使用说明 (`autocheck.sh`)
 
 > **脚本路径**
-> `/data/data/com.termux/files/home/services/home_assistant/autocheck.sh`
+> `/data/data/com.termux/files/home/servicemanager/hass/autocheck.sh`
 
 > **脚本概览**
 >
@@ -56,35 +56,7 @@ AC_MAX_FAILS=5 AC_UPDATE_INTERVAL=$((3*3600)) bash autocheck.sh
 
 ---
 
-### 5. 用于定时任务示例
 
-**Termux runit**
-
-```bash
-# /data/data/com.termux/files/usr/var/service/ha-autocheck/run
-#!/data/data/com.termux/files/usr/bin/bash
-exec every 60 /data/data/com.termux/files/home/services/home_assistant/autocheck.sh
-```
-
-**crontab (容器内)**
-
-```cron
-* * * * *  bash /services/home_assistant/autocheck.sh
-* * * * *  sleep 30 && bash /services/home_assistant/autocheck.sh
-```
-
----
-
-### 6. 故障排查
-
-| MQTT 状态            | 可能原因                                 | 处理建议                           |
-| ------------------ | ------------------------------------ | ------------------------------ |
-| `failed`           | `start.sh` 启动未成功，查看 `fail.count` 与日志 | 检查依赖 / 端口占用                    |
-| `permanent_failed` | 达到 `AC_MAX_FAILS`                    | 手动执行 `start.sh` 观察详细错误         |
-| `disabled`         | 用户执行了 `stop.sh` 并未重新启动               | 运行 `start.sh` 或删除 `.disabled`  |
-| 更新不触发              | `TARGET_VERSION` 未定义或间隔未到            | 设置环境变量并等待 `AC_UPDATE_INTERVAL` |
-
----
 
 > **提示**
 >
