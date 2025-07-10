@@ -19,7 +19,7 @@
 | ③  | 日志   | 所有输出写入独立日志，日志存入 存入/sdcard/isgbackup/hass/；                           |
 | ④  | MQTT      | 通过termux Mosquitto cli 上报 MQTT，主题：isg/backup/hass/status `backuping` → `success` / `failed`。                                       |
 | 5  | 自动清理      | 保留最新 **3** 份备份与日志（可调）                                        |
-
+MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 备份文件示例：
 
 ```
