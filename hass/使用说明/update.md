@@ -9,6 +9,7 @@
 > * **版本号来源**：`TARGET_VERSION` 环境变量，或脚本第一个参数。
 > * 过程日志写入 `/sdcard/isgbackup/ha/update_<时间>.log`。
 > * 通过termux Mosquitto cli 上报 MQTT，主题：isg/update/hass/status `updating` → `success` / `failed`。
+> * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 
 ---
 
