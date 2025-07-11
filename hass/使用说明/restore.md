@@ -97,6 +97,7 @@ bash backup.sh || echo "[WARN] 备份失败，继续还原"
 > * 错误消息：通过MQTT message上报，message为英文
 > * 日志: 所有输出写入独立日志，日志存入/data/data/com.termux/files/home/servicemanager/hass/logs/restore.log, 保存最近500条
 > * 环境变量：可以指定备份的文件路径，从指定的路径进行备份，如果指定的文件格式不是*.tar.gz,MQTT上报错误。如果是zip压缩文件，则先将文件解压，然后再压缩成*.tar.gz文件，最后进行还原
+> * 还原完成之后，需要使用stop.sh, start.sh, 重启HA系统，查看status，如果显示running，这个时候才显示success，中间过程的status需要通过MQTT上报
 > * 成功 MQTT 示例：
 ```json
 {
