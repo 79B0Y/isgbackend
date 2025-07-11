@@ -131,6 +131,7 @@ pip install zlib-ng isal --no-binary :all:
 > * 完成上报：MQTT `success`，payload 包含版本号与日志路径
 > * MQTT上报：通过termux Mosquitto cli 上报 MQTT，主题：isg/backup/hass/status backuping → success / failed
 > * MQTT broker：登陆信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml 获取
+> * 错误消息：通过MQTT message上报，message为英文
 > * 执行成功后 MQTT 示例：
 
 ```json
