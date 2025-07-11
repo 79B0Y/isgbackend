@@ -174,23 +174,47 @@ sv status isgservicemonitor
   "uptime": "120s"
 }
 ```
+5) 各服务子系统可用性自检
 
----
+在 isgservicemonitor 成功启动后，自动调用各个服务的自检脚本，以验证其独立可用性：
 
-### ✨ 可选扩展：
+✅ 检查流程：
 
-* 封装为函数 `check_runit()` `check_isg()` 方便重用
-* 实现 MQTT 日志推送函数 `mqtt_report <topic> <payload>`
-* 在 `.bashrc` 中加入 runsvdir 自启控制
+遍历服务子系统目录（例如 servicemanager 下的各模块）：
 
----
+for service in /data/data/com.termux/files/usr/servicemanager/*; do
+    [ -f "$service/autocheck.sh" ] && bash "$service/autocheck.sh"
+    # 建议每个 autocheck.sh 内部自行处理 MQTT 上报
+done
+
+每个 <service_id>/autocheck.sh 自检脚本应实现：
+
+启动状态验证（端口/进程/功能）
+
+输出标准 MQTT 上报，如：
+
+isg/service/<service_id>/status {
+  "status": "ok" | "failed",
+  "detail": "port open, mqtt connected..."
+}
+
+示例目录结构：
+
+servicemanager/
+├── hass/
+│   └── autocheck.sh
+├── mosquitto/
+│   └── autocheck.sh
+└── z2m/
+    └── autocheck.sh
+
+建议统一封装 MQTT 上报工具函数 mqtt_report <topic> <json_payload> 供所有 autocheck.sh 使用。
 
 
 
 
 
-
-Autocheckall.sh 的职责
+Autocheckall.sh 的职责提示词
 
 1） 确保runit正常运行 
     - ps aux | grep runsvdir，MQTT 上报结果
