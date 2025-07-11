@@ -117,6 +117,7 @@ EOF
 > * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
 > * 错误消息：通过MQTT message上报，message为英文
 > * 通过环境参数可以指定升级的版本
+> * 升级后需要使用stop.sh停止homeassistant, start.sh开启homeassistant, 最后使用status.sh来判断HA是否运行起来，正常运行后才能判断为success
 > * 升级脚本
 >
 ```bash
@@ -145,3 +146,10 @@ log_step "✅ 升级完成"
 
 EOF
 ```
+
+增加校验：若未设置 TARGET_VERSION 环境变量，则立即：
+打印错误，上报 MQTT 状态 failed
+脚本中止，不再进入 proot 升级逻辑
+现在必须这样运行：
+TARGET_VERSION=2025.7.1 bash update.sh
+否则脚本将拒绝执行，避免出现 homeassistant== 的错误命令。还需验证版本号格式或校验升级是否成功
