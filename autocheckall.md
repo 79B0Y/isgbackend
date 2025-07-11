@@ -275,7 +275,7 @@ SERVICEMANAGER_DIR="${SERVICEMANAGER_DIR:-/data/data/com.termux/files/home/servi
   # ⬇️ 脚本主体放在这里
   bash autocheck_core.sh
 
-) 200>/tmp/autocheckall.lock
+) 200>/data/data/com.termux/files/usr/var/lock/autocheckall.lock
 ```
 
 防止多个任务（cron / App）同时触发造成冲突。
