@@ -144,13 +144,13 @@ pip install zlib-ng isal --no-binary :all:
 ```
 
 安装的脚本：
-# ------------------------------------------------------------
-# 1. 更新系统并安装依赖
+### ------------------------------------------------------------
+### 1. 更新系统并安装依赖
 log_step "更新 apt 索引并安装系统依赖 (ffmpeg libturbojpeg)"
 run_or_fail "apt update" "apt update -y"
 run_or_fail "安装 ffmpeg libturbojpeg" "apt install -y ffmpeg libturbojpeg"
 
-# 2. 创建并初始化 Python 虚拟环境
+### 2. 创建并初始化 Python 虚拟环境
 log_step "创建 Python 虚拟环境 /root/homeassistant"
 run_or_fail "创建 venv" "python3 -m venv /root/homeassistant"
 
@@ -162,11 +162,11 @@ PY_SETUP='source /root/homeassistant/bin/activate && \
   pip install PyTurboJPEG'
 run_or_fail "安装基础依赖" "$PY_SETUP"
 
-# 3. 安装 Home Assistant
+### 3. 安装 Home Assistant
 log_step "安装 Home Assistant 2025.5.3"
 run_or_fail "pip 安装 Home Assistant" "source /root/homeassistant/bin/activate && pip install homeassistant==2025.5.3"
 
-# 4. 首启生成配置目录
+### 4. 首启生成配置目录
 log_step "首次启动 Home Assistant，生成配置目录"
 HASS_PID=$(in_proot "source /root/homeassistant/bin/activate && hass & echo \$!")
 echo "[INFO] 初始化进程 PID: $HASS_PID"
@@ -186,17 +186,17 @@ if (( COUNT >= MAX_TRIES )); then
     exit 1
 fi
 
-# 5. 终止并优化压缩库
+### 5. 终止并优化压缩库
 log_step "终止首次启动进程并安装 zlib-ng / isal"
 in_proot "kill $HASS_PID"
 run_or_fail "安装 zlib-ng isal" "source /root/homeassistant/bin/activate && pip install zlib-ng isal --no-binary :all:"
 
-# 6. 调整 configuration.yaml
+### 6. 调整 configuration.yaml
 log_step "配置 logger 为 critical & 允许 iframe"
 in_proot "grep -q '^logger:' /root/.homeassistant/configuration.yaml || echo -e '\nlogger:\n  default: critical' >> /root/.homeassistant/configuration.yaml"
 in_proot "grep -q 'use_x_frame_options:' /root/.homeassistant/configuration.yaml || echo -e '\nhttp:\n  use_x_frame_options: false' >> /root/.homeassistant/configuration.yaml"
 
-# 7. 完成并上报
+### 7. 完成并上报
 VERSION_STR=$(in_proot "source /root/homeassistant/bin/activate && hass --version")
 log_step "安装完成，Home Assistant 版本: $VERSION_STR"
 
