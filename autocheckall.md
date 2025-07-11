@@ -4,7 +4,7 @@
 
 ---
 
-### ὓ9 1) 确保 runit 正常运行
+### 1) 确保 runit 正常运行
 
 #### ✅ 步骤
 
@@ -68,7 +68,7 @@
 
 ---
 
-### ὓ9 2) 确认 runsv 是否监控重要服务
+### 2) 确认 runsv 是否监控重要服务
 
 #### ✅ 目标服务：
 
@@ -96,7 +96,7 @@ sv status mysqld
 
 ---
 
-### ὓ9 3) 确保 isgservicemonitor 服务启动和安装
+### 3) 确保 isgservicemonitor 服务启动和安装
 
 #### ✅ 步骤
 
@@ -159,7 +159,7 @@ done
 
 ---
 
-### ὓ9 4) 确认 isgservicemonitor 服务最终状态
+### 4) 确认 isgservicemonitor 服务最终状态
 
 ```bash
 sv status isgservicemonitor
@@ -224,4 +224,6 @@ Autocheckall.sh 的职责
   - 安装后再次用 sv start isgservicemonitor 启动，尝试3次，没有成功启动，MQTT 上报
 
 4) isgservicemonitor服务是启动状态，sv status isgservicemonitor
+
+5）当确保了isgservicemonitor服务启动之后，分别使用各个服务<service_id>里的autocheck来检查其可用性，例如 servicemanager/hass/autocheck.sh, 检查后将结果用MQTT上报
 
