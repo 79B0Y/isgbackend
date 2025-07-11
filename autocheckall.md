@@ -8,7 +8,7 @@
 
 #### ✅ 步骤
 
-1. **检测 `runsvdir` 是否运行**
+1. **检测 **\`\`** 是否运行**
 
    ```bash
    if ! pgrep -f runsvdir >/dev/null; then
@@ -226,6 +226,80 @@ servicemanager/
 
 ---
 
+### ✨ 通用优化建议
+
+#### ✅ 日志输出函数
+
+```bash
+log_info()  { echo "[INFO] $1"; }
+log_warn()  { echo "[WARN] $1"; }
+log_error() { echo "[ERROR] $1"; }
+```
+
+建议全程用 `log_info` 等替代 echo，提高一致性与可调试性。
+
+#### ✅ MQTT 上报函数
+
+```bash
+mqtt_report() {
+  local topic="$1"
+  local payload="$2"
+  mosquitto_pub -h "$MQTT_HOST" -p "$MQTT_PORT" -t "$topic" -m "$payload"
+}
+```
+
+* 从 `configuration.yaml` 提取 `$MQTT_HOST`、`$MQTT_PORT`，建议集中读取一次。
+
+#### ✅ 路径与环境变量统一
+
+```bash
+SERVICEMANAGER_DIR="${SERVICEMANAGER_DIR:-/data/data/com.termux/files/home/servicemanager}"
+```
+
+用于替代文中硬编码路径。
+
+#### ✅ 加入并发锁防护
+
+```bash
+(
+  flock -n 200 || {
+    echo "[WARN] 检测到已有 autocheckall.sh 实例运行，退出"
+    exit 1
+  }
+
+  # ⬇️ 脚本主体放在这里
+  bash autocheck_core.sh
+
+) 200>/tmp/autocheckall.lock
+```
+
+防止多个任务（cron / App）同时触发造成冲突。
+
+#### ✅ 支持服务黑名单（跳过某些服务）
+
+```bash
+IFS=',' read -r -a SKIP <<< "${SKIP_SERVICES}"
+[[ " ${SKIP[*]} " =~ " $sid " ]] && continue
+```
+
+环境变量 `SKIP_SERVICES=hass,mysqld` 可跳过指定服务。
+
+#### ✅ 汇总统一上报版本和状态（可选）
+
+```json
+isg/status/versions {
+  "timestamp": 1720575012,
+  "services": {
+    "hass": { "version": "1.3.2", "status": "running" },
+    "z2m": { "version": "1.1.0", "status": "failed" }
+  }
+}
+```
+
+通过汇总每个服务 autocheck 输出生成。
+
+---
+
 ### ✨ 可选扩展：
 
 * 封装为函数 `check_runit()` `check_isg()` 方便重用
@@ -234,6 +308,78 @@ servicemanager/
 
 ---
 
+### 📡 MQTT 上报主题汇总
+
+#### 🧩 runit 系统相关
+
+* `isg/system/runit/status`
+
+  ```json
+  { "runsvdir": "running" | "restarted" | "failed" }
+  ```
+* `isg/system/runit/service_dir`
+
+  ```json
+  { "valid": true | false, "missing_services": ["xxx"] }
+  ```
+* `isg/system/runit/supervision`
+
+  ```json
+  {
+    "isgservicemonitor": "run" | "down",
+    "sshd": "run" | "down",
+    "mysqld": "run" | "down"
+  }
+  ```
+
+#### 🛡️ isgservicemonitor 服务相关
+
+* `isg/system/isgservicemonitor/start`
+
+  ```json
+  { "status": "failed", "attempts": 3 }
+  ```
+* `isg/system/isgservicemonitor/install`
+
+  ```json
+  { "status": "failed", "reinstall_attempted": true }
+  ```
+* `isg/system/isgservicemonitor/final_status`
+
+  ```json
+  {
+    "status": "running" | "stopped",
+    "pid": 1234,
+    "uptime": "120s"
+  }
+  ```
+
+#### 🧪 各服务自检（来自 `autocheck.sh`）
+
+* `isg/service/<service_id>/status`
+
+  ```json
+  {
+    "status": "ok" | "failed",
+    "detail": "port open, mqtt connected..."
+  }
+  ```
+
+#### 📦 版本汇总上报
+
+* `isg/status/versions`
+
+  ```json
+  {
+    "timestamp": 1720575012,
+    "services": {
+      "hass": { "version": "1.3.2", "status": "running" },
+      "z2m": { "version": "1.1.0", "status": "failed" }
+    }
+  }
+  ```
+
+---
 
 
 
