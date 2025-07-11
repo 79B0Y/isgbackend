@@ -1,89 +1,109 @@
-edr## Home Assistant 还原脚本说明 (`restore.sh`)
+## Home Assistant 还原脚本设计规范 (`restore.sh`)
 
-> **脚本路径**
+> 脚本路径:
 > `/data/data/com.termux/files/home/servicemanager/hass/restore.sh`
 
-> **脚本功能**
+> 适用环境:
 >
-> * 从 **最新备份** `homeassistant_backup_*.tar.gz` 还原 Home Assistant 配置；若无备份则使用 `homeassistant_original.tar.gz`。
-> * 自动停止服务 → 清空配置 → 解压备份 → 重启服务。
-> * 过程日志写入 `/sdcard/isgbackup/hass/restore_<时间>.log`。
-> * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/hass/status `restoring` → `success` / `failed`。
-> * 自动清理	保留最新 3 份备份与日志（可调）
-> * MQTT broker信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml获取
----
-
-### 1. 备份选择逻辑
-
-1. **指定参数**：`bash restore.sh /path/to/backup.tar.gz`
-2. **自动选择**：无参数时，脚本会在 `/sdcard/isgbackup/ha/` 找最新时间戳的 `homeassistant_backup_*.tar.gz`。
-3. **默认备份**：若找不到任何备份，则尝试读取 `homeassistant_original.tar.gz`（初始镜像）。
+> * Termux + Proot Ubuntu
+> * Home Assistant 数据还原操作
 
 ---
 
-### 2. 快速使用
+### 1. 功能概览
+
+| 步骤        | 操作内容                                                                       |
+| --------- | -------------------------------------------------------------------------- |
+| 先备份       | 执行 `backup.sh`，如失败则继续选择旧备份                                                 |
+| 还原选择      | 自动选择最新 backup.tar.gz，或指定路径                                                 |
+| 压缩格式      | 如非 .tar.gz，而是 .zip ，则先解压后重新压缩为 tar.gz                                      |
+| 系统操作      | 停止服务，清空配置，解压还原，重启                                                          |
+| 日志输出      | 写入 `/data/data/com.termux/files/home/servicemanager/hass/logs/restore.log` |
+| MQTT 上报   | 上报为 `isg/restore/hass/status` ，包括 `restoring` → `success` / `failed`       |
+| Broker 配置 | 从 `configuration.yaml` 读取 MQTT 信息                                          |
+
+---
+
+### 2. 执行流程
 
 ```bash
-# 使用最新备份自动还原
-bash restore.sh
+# 1. 先备份，确保可回滚
+bash backup.sh || echo "[WARN] 备份失败，继续还原"
 
-# 指定备份文件
-bash restore.sh homeassistant_backup_20250710-030000.tar.gz
-```
-也可以指定不通名称格式的 ***.tar.gz
+# 2. 选择备份文件
+若指定路径：检查 *.tar.gz 格式，非 tar.gz 则异常上报
+如为 zip 文件： unzip 后重压缩为 .tar.gz
 
+# 3. 还原操作
+- 停止服务
+- 清空 /root/.homeassistant
+- 解压 tar.gz 文件
+- 重启服务
 
-成功 MQTT 示例：
-
-```json
-{
-  "service":"hass",
-  "status":"success",
-  "file":"/sdcard/isgbackup/hass/homeassistant_backup_20250710-030000.tar.gz",
-  "log":"/sdcard/isgbackup/hass/restore_20250710-031000.log",
-  "timestamp":1720575060
-}
+# 4. 日志 + MQTT 上报
 ```
 
 ---
 
 ### 3. 环境变量
 
-| 变量             | 默认值                    | 说明                         |
-| -------------- | ---------------------- | -------------------------- |
-| `PROOT_DISTRO` | `ubuntu`               | 容器名称 (`proot-distro list`) |
-| `BACKUP_DIR`   | `/sdcard/isgbackup/hass` | 备份与日志根目录                   |
+| 名称             | 默认值                      | 说明         |
+| -------------- | ------------------------ | ---------- |
+| `PROOT_DISTRO` | `ubuntu`                 | Proot 容器名称 |
+| `BACKUP_DIR`   | `/sdcard/isgbackup/hass` | 备份文件默认目录   |
+| `RESTORE_FILE` | *(optional)*             | 指定备份文件路径   |
 
 ---
 
-### 4. 日志文件
+### 4. MQTT 成功上报示例
 
-* 还原过程：`restore_<timestamp>.log`
-* 运行日志：还原后会由 `start.sh` 继续写入 `hass_runtime.log`
-
-常用查看：
-
-```bash
-tail -f /sdcard/isgbackup/hass/restore_*.log
+```json
+{
+  "service": "hass",
+  "status": "success",
+  "file": "/sdcard/isgbackup/hass/homeassistant_backup_20250710-030000.tar.gz",
+  "log": "/data/data/com.termux/files/home/servicemanager/hass/logs/restore.log",
+  "timestamp": 1720575060
+}
 ```
 
 ---
 
-### 5. 故障排查
+### 5. 设计要点
 
-| 场景           | 解决方案                                                  |
-| ------------ | ----------------------------------------------------- |
-| `no_backup`  | 备份目录为空 → 检查路径或先执行 `backup.sh`                         |
-| `tar_failed` | 备份损坏或磁盘空间不足；确认文件完整 & `df -h`                          |
-| 服务启动失败       | 查看 `hass_runtime.log`，必要时执行 `stop.sh`、`start.sh` 手动检验 |
-
----
-
-### 6. 还原前建议
-
-> * **强烈推荐**：在执行还原前先运行 `backup.sh` 生成最新备份，以防回滚失败导致数据丢失。
-> * 确保设备电源与网络稳定，解压过程中切勿断电或杀进程。
+* 基于 tar.gz 格式统一备份管理，支持 zip 格式选项
+* 自动定位最新 backup\_日期.tar.gz，确保最大化数据恢复
+* 返回日志低促化反复，配合 `autocheck.sh` 重试启动
+* 通过 MQTT 进行可视化进度显示，便于前端管理同步
 
 ---
 
-> **备注**：还原脚本不会回退虚拟环境中的 Home Assistant 版本。如果需要同时回退版本，请先执行 `update.sh <旧版>` 再运行 `restore.sh`。
+> 推荐配合升级或卸载前执行还原，确保 HA 环境维持最佳状态
+
+
+
+## Home Assistant 还原脚本说明 (`restore.sh`)提示词
+
+> **脚本路径**
+> `/data/data/com.termux/files/home/servicemanager/hass/restore.sh`
+
+> **脚本功能**
+>
+> * 在执行还原前先运行 `backup.sh` 生成最新备份，以防回滚失败导致数据丢失，如果备份失败，则直接选取最新备份
+> * 从 **最新备份** `homeassistant_backup_*.tar.gz` 还原 Home Assistant 配置；若无备份则使用 `homeassistant_original.tar.gz`。
+> * 自动停止服务 → 清空配置 → 解压备份 → 重启服务。
+> * 通过termux Mosquitto cli 上报 MQTT, 主题：isg/restore/hass/status `restoring` → `success` / `failed`。
+> * MQTT broker：登陆信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml 获取
+> * 错误消息：通过MQTT message上报，message为英文
+> * 日志: 所有输出写入独立日志，日志存入/data/data/com.termux/files/home/servicemanager/hass/logs/restore.log, 保存最近500条
+> * 环境变量：可以指定备份的文件路径，从指定的路径进行备份，如果指定的文件格式不是*.tar.gz,MQTT上报错误。如果是zip压缩文件，则先将文件解压，然后再压缩成*.tar.gz文件，最后进行还原
+> * 成功 MQTT 示例：
+```json
+{
+  "service":"hass",
+  "status":"success",
+  "file":"/sdcard/isgbackup/hass/homeassistant_backup_20250710-030000.tar.gz",
+  "log":"/data/data/com.termux/files/home/servicemanager/hass/logs/restore.log",
+  "timestamp":1720575060
+}
+```
