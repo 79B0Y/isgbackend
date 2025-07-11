@@ -147,6 +147,11 @@ pip install zlib-ng isal --no-binary :all:
 ## 安装脚本步骤说明
 
 ---
+### 0. 登陆proot ubuntu容器
+
+```bash
+proot-distro login ubuntu << 'EOF'
+```
 
 ### 1. 更新系统并安装依赖
 
@@ -240,5 +245,6 @@ in_proot "grep -q 'use_x_frame_options:' /root/.homeassistant/configuration.yaml
 ```bash
 VERSION_STR=$(in_proot "source /root/homeassistant/bin/activate && hass --version")
 log_step "安装完成，Home Assistant 版本: $VERSION_STR"
+EOF
 ```
 
