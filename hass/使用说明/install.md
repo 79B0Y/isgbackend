@@ -143,14 +143,23 @@ pip install zlib-ng isal --no-binary :all:
 }
 ```
 
-安装的脚本：
-### ------------------------------------------------------------
+## 安装脚本步骤说明
+
+---
+
 ### 1. 更新系统并安装依赖
+
+```bash
 log_step "更新 apt 索引并安装系统依赖 (ffmpeg libturbojpeg)"
 run_or_fail "apt update" "apt update -y"
 run_or_fail "安装 ffmpeg libturbojpeg" "apt install -y ffmpeg libturbojpeg"
+```
+
+---
 
 ### 2. 创建并初始化 Python 虚拟环境
+
+```bash
 log_step "创建 Python 虚拟环境 /root/homeassistant"
 run_or_fail "创建 venv" "python3 -m venv /root/homeassistant"
 
@@ -161,42 +170,74 @@ PY_SETUP='source /root/homeassistant/bin/activate && \
   pip install aiohttp==3.10.8 attrs==23.2.0 && \
   pip install PyTurboJPEG'
 run_or_fail "安装基础依赖" "$PY_SETUP"
+```
+
+---
 
 ### 3. 安装 Home Assistant
+
+```bash
 log_step "安装 Home Assistant 2025.5.3"
 run_or_fail "pip 安装 Home Assistant" "source /root/homeassistant/bin/activate && pip install homeassistant==2025.5.3"
+```
+
+---
 
 ### 4. 首启生成配置目录
+
+```bash
 log_step "首次启动 Home Assistant，生成配置目录"
-HASS_PID=$(in_proot "source /root/homeassistant/bin/activate && hass & echo \$!")
+HASS_PID=$(in_proot "source /root/homeassistant/bin/activate && hass & echo $!")
 echo "[INFO] 初始化进程 PID: $HASS_PID"
 
-MAX_TRIES=90; COUNT=0
+MAX_TRIES=90
+COUNT=0
 while (( COUNT < MAX_TRIES )); do
-    if nc -z 127.0.0.1 8123 2>/dev/null; then
-        echo "[INFO] Home Assistant Web 已就绪"
-        break
-    fi
-    COUNT=$((COUNT+1)); sleep 60
+  if nc -z 127.0.0.1 8123 2>/dev/null; then
+    echo "[INFO] Home Assistant Web 已就绪"
+    break
+  fi
+  COUNT=$((COUNT+1))
+  sleep 60
 done
+
 if (( COUNT >= MAX_TRIES )); then
-    echo "[ERROR] 初始化超时"
-    in_proot "kill $HASS_PID || true"
-    mqtt_report install_failed "{\"error\":\"init_timeout\",\"log\":\"$LOG_FILE\"}"
-    exit 1
+  echo "[ERROR] 初始化超时"
+  in_proot "kill $HASS_PID || true"
+  mqtt_report install_failed "{\"error\":\"init_timeout\",\"log\":\"$LOG_FILE\"}"
+  exit 1
 fi
+```
+
+---
 
 ### 5. 终止并优化压缩库
+
+```bash
 log_step "终止首次启动进程并安装 zlib-ng / isal"
 in_proot "kill $HASS_PID"
 run_or_fail "安装 zlib-ng isal" "source /root/homeassistant/bin/activate && pip install zlib-ng isal --no-binary :all:"
+```
+
+---
 
 ### 6. 调整 configuration.yaml
+
+```bash
 log_step "配置 logger 为 critical & 允许 iframe"
-in_proot "grep -q '^logger:' /root/.homeassistant/configuration.yaml || echo -e '\nlogger:\n  default: critical' >> /root/.homeassistant/configuration.yaml"
-in_proot "grep -q 'use_x_frame_options:' /root/.homeassistant/configuration.yaml || echo -e '\nhttp:\n  use_x_frame_options: false' >> /root/.homeassistant/configuration.yaml"
+in_proot "grep -q '^logger:' /root/.homeassistant/configuration.yaml || \
+  echo -e '\nlogger:\n  default: critical' >> /root/.homeassistant/configuration.yaml"
+
+in_proot "grep -q 'use_x_frame_options:' /root/.homeassistant/configuration.yaml || \
+  echo -e '\nhttp:\n  use_x_frame_options: false' >> /root/.homeassistant/configuration.yaml"
+```
+
+---
 
 ### 7. 完成并上报
+
+```bash
 VERSION_STR=$(in_proot "source /root/homeassistant/bin/activate && hass --version")
 log_step "安装完成，Home Assistant 版本: $VERSION_STR"
+```
 
