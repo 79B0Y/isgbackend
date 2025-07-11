@@ -119,6 +119,7 @@ pip install zlib-ng isal --no-binary :all:
 > * 在 ** proot-distro ubuntu ** 中创建 Python 虚拟环境并安装 Home Assistant `2025.5.3` 及依赖。
 > * 全程输出日志到 `/sdcard/isgbackup/hass/install_<时间>.log`
 > * 通过termux Mosquitto cli 上报 MQTT，主题：isg/install/hass/status installing → installed / failed。
+> * 增加target version，可以通过环境变量指定安装版本
 ---
 
 ### 功能概览
