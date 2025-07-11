@@ -1,30 +1,37 @@
 
 ## Home Assistant 安装脚本设计规范 (`install.sh`)
 
-> **脚本路径**
+> 脚本路径:
 > `/data/data/com.termux/files/home/servicemanager/hass/install.sh`
 
----
-
-### 1. 功能概览
-
-该脚本用于在 Proot 容器 (ubuntu) 中安装指定版本的 Home Assistant，创建 Python 虚拟环境、配置基础依赖，确保服务可成功运行。
-
-> 脚本全程生成日志，上报 MQTT 状态，与 Web/App 交互合作，支持自检和升级组件调用。
+> 适用环境:
+>
+> * Termux + Proot-Distro `ubuntu`
+> * Home Assistant 安装自动化、稳定化脚本
 
 ---
 
-### 2. 操作流程
+### 1. 执行目标
 
-| 步骤          | 操作说明                                                             |
-| ----------- | ---------------------------------------------------------------- |
-| 系统依赖        | `apt update`，安装 `ffmpeg` 和 `libturbojpeg`                        |
-| Python venv | 创建 `/root/homeassistant` 虚拟环境，安装 pip + numpy/pillow/aiohttp/等基础库 |
-| 安装 HA       | 按指定版本 (e.g. 2025.5.3) pip install Home Assistant                 |
-| 初始启动        | 后台运行 hass，等待 8123 端口开启 (90分钟内)                                   |
-| 压缩优化        | pip install `zlib-ng` / `isal` 源码版，提升性能                          |
-| 配置补丁        | `configuration.yaml` 添加 logger: critical / 允许 iframe             |
-| MQTT 上报     | 为 `isg/install/hass/status` ，上报 installing → installed / failed  |
+* 检测 `/root/homeassistant` 虚拟环境是否存在，如果存在则调用 `uninstall.sh` 前置卸载
+* 创建 Python venv + 基础依赖 + Home Assistant 指定版本
+* 验证首启是否成功，确保 HA 可用
+* MQTT 上报 `installing` → `success` / `failed`
+* 日志输出到 `/data/data/com.termux/files/home/servicemanager/hass/logs/install.log`
+
+---
+
+### 2. 功能概览
+
+| 步骤          | 操作内容                                                       |
+| ----------- | ---------------------------------------------------------- |
+| 系统依赖        | apt update + ffmpeg + libturbojpeg                         |
+| Python venv | `/root/homeassistant` + pip 升级 + numpy/mutagen/pillow/等基础包 |
+| HA 安装       | pip install `homeassistant==2025.5.3`                      |
+| 首启检测        | 启动 hass 进程，检测 8123 端口结果                                    |
+| 压缩优化        | pip install zlib-ng isal --no-binary \:all:                |
+| 配置补丁        | `logger: critical` + `http.use_x_frame_options: false`     |
+| MQTT 上报     | topic: `isg/install/hass/status`                           |
 
 ---
 
@@ -42,35 +49,37 @@
 
 ---
 
-### 4. 脚本举例流程 (Shell)
+### 4. 执行流程逻辑
 
 ```bash
-# 更新 apt 和安装依赖
-apt update -y
-apt install -y ffmpeg libturbojpeg
+# 如存在前版本则先卸载
+[ -d /root/homeassistant ] && bash uninstall.sh
 
-# 创建 Python venv
+# 1. 系统依赖
+apt update && apt install -y ffmpeg libturbojpeg
+
+# 2. Python venv
 python3 -m venv /root/homeassistant
 source /root/homeassistant/bin/activate
 pip install --upgrade pip
 pip install numpy mutagen pillow aiohttp_fast_zlib
 pip install aiohttp==3.10.8 attrs==23.2.0 PyTurboJPEG
 
-# 安装 Home Assistant
+# 3. 安装 HA
 pip install homeassistant==2025.5.3
 
-# 后台启动并等待端口开启
-hass &
-# 等待 8123 打开，最多 90 分钟
+# 4. 首启检测
+hass & PID=$!
+sleep 最多 90 分钟，检测 8123 是否开放
+如超时前杀死进程并上报 failed
 
-# 安装 zlib-ng 和 isal 优化压缩性能
+# 5. 压缩优化
 pip install zlib-ng isal --no-binary :all:
 
-# 配置文件补丁
-# logger: critical
-# http: use_x_frame_options: false
+# 6. 配置补丁
+向 configuration.yaml 写 logger + http 设置
 
-# MQTT 上报安装成功
+# 7. MQTT 上报 success + 完成版本检查
 ```
 
 ---
@@ -79,30 +88,23 @@ pip install zlib-ng isal --no-binary :all:
 
 | 名称             | 默认值                      | 说明                   |
 | -------------- | ------------------------ | -------------------- |
-| `PROOT_DISTRO` | `ubuntu`                 | 容器名称                 |
-| `BACKUP_DIR`   | `/sdcard/isgbackup/hass` | 日志保存目录               |
-| `HASS_VERSION` | `2025.5.3`               | 指定安装的 HA 版本 (SemVer) |
+| `PROOT_DISTRO` | `ubuntu`                 | 指定 proot-distro 名称   |
+| `BACKUP_DIR`   | `/sdcard/isgbackup/hass` | 日志/备份目录              |
+| `HASS_VERSION` | `2025.5.3`               | 指定 Home Assistant 版本 |
 
 ---
 
 ### 6. 设计要点
 
-* 自动重试启动，保障配置目录生成
-* 异常处理包括超时断定和 MQTT 失败上报
-* 与 `autocheck.sh` 和 `start.sh` 稳定扩展配合
+* 首先判断旧 venv，确保环境稳定重装
+* 可重复执行，并有 MQTT 状态反馈
+* 首启检测监控服务是否实际可用
+* 配置补丁确保 HA 在 iframe/静默日志下稳定运行
+* 解耦 backup.sh/上报和 autocheck.sh 进行自检功能联动
 
 ---
 
-> 推荐在执行 `update.sh`、还原、数据迁移前先手动执行一次安装脚本。
-
-
-
-
-
-
-
-
-
+> 推荐配合升级前 backup.sh，或配合 `autocheck.sh` 自动更新使用
 
 
 
@@ -113,8 +115,8 @@ pip install zlib-ng isal --no-binary :all:
 > `/data/data/com.termux/files/home/servicemanager/hass/install.sh`
 
 > **运行目标**
->
-> * 在 **proot-distro 容器 (ubuntu)** 中创建 Python 虚拟环境并安装 Home Assistant `2025.5.3` 及依赖。
+> * 首先检查proot-distro ubuntu里/root/homeassistant 虚拟环境是否存在，如果存在，需要先执行uninstall.sh卸载home assistant，并删除改虚拟环境
+> * 在 ** proot-distro ubuntu ** 中创建 Python 虚拟环境并安装 Home Assistant `2025.5.3` 及依赖。
 > * 全程输出日志到 `/sdcard/isgbackup/hass/install_<时间>.log`
 > * 通过termux Mosquitto cli 上报 MQTT，主题：isg/install/hass/status installing → installed / failed。
 ---
