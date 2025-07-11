@@ -200,5 +200,3 @@ in_proot "grep -q 'use_x_frame_options:' /root/.homeassistant/configuration.yaml
 VERSION_STR=$(in_proot "source /root/homeassistant/bin/activate && hass --version")
 log_step "安装完成，Home Assistant 版本: $VERSION_STR"
 
-echo "======== Home Assistant 安装脚本结束 ========"
-
