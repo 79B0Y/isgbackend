@@ -93,9 +93,9 @@ sv status mysqld
 
 ```json
 {
-  "isgservicemonitor": "run" | "down",
-  "sshd": "run" | "down",
-  "mysqld": "run" | "down"
+  "isgservicemonitor": "run" | "down" | "invalid",
+  "sshd": "run" | "down" | "invalid",
+  "mysqld": "run" | "down" | "invalid"
 }
 ```
 
@@ -389,8 +389,6 @@ isg/status/versions {
 
 
 
-
-
 Autocheckall.sh 的职责提示词
 
 1） 确保runit正常运行 
@@ -431,4 +429,5 @@ Autocheckall.sh 的职责提示词
 6）由于 isgservicemonitor ，做了与runit相互保全的工作，isgservicemonitor 也会每隔一段时间检查 rundir有没有起来，为了避免重复启用runit，在确保 runit 正常运行里，启动runsvdir -P /data/data/com.termux/files/usr/etc/service &之前需要提前判断 isgservicemonitor是否在运行
 
 7）把autocheckall里涉及到所有的mqtt消息汇总一下，放在文档最后面
+8）在 sv status 的 MQTT 上报中加入了 "invalid" 状态，用于表示 runsv not running 等异常情况，避免误判为正常或仅是未启动。
 
