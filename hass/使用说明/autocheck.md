@@ -186,5 +186,6 @@
 6) 没有成功启动，使用install.sh重新安装一次home assistant，MQTT 上报
 7) 使用restore.sh来还原默认备份，或者backup.sh产生的备份
 9) 使用start.sh来启动home assistant
+10) hass对cpu和内存还有其它性能指标，通过MQTT上报
 
 最终目的是为了保证home assistant能够成功启动
