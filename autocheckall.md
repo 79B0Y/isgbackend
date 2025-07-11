@@ -8,17 +8,22 @@
 
 #### ✅ 步骤
 
-1. **检测 **\`\`** 是否运行**
+1. **检测 runsvdir 是否运行（避免与 isgservicemonitor 重复启动）**
 
    ```bash
    if ! pgrep -f runsvdir >/dev/null; then
-       echo "[!] runsvdir 未运行，尝试启动..."
-       runsvdir -P /data/data/com.termux/files/usr/etc/service &
-       sleep 2
-       if pgrep -f runsvdir >/dev/null; then
-           runsvdir_status="restarted"
+       if pgrep -f "com.termux.*isgservicemonitor" >/dev/null; then
+           echo "[INFO] runsvdir 未运行，但 isgservicemonitor 已在运行，跳过本地启动。"
+           runsvdir_status="assumed_by_isgservicemonitor"
        else
-           runsvdir_status="failed"
+           echo "[!] runsvdir 未运行，尝试由 autocheckall.sh 启动..."
+           runsvdir -P /data/data/com.termux/files/usr/etc/service &
+           sleep 2
+           if pgrep -f runsvdir >/dev/null; then
+               runsvdir_status="restarted"
+           else
+               runsvdir_status="failed"
+           fi
        fi
    else
        runsvdir_status="running"
@@ -385,6 +390,7 @@ isg/status/versions {
 
 
 
+
 Autocheckall.sh 的职责提示词
 
 1） 确保runit正常运行 
@@ -421,4 +427,8 @@ Autocheckall.sh 的职责提示词
 4) isgservicemonitor服务是启动状态，sv status isgservicemonitor
 
 5）当确保了isgservicemonitor服务启动之后，分别使用各个服务<service_id>里的autocheck来检查其可用性，例如 servicemanager/hass/autocheck.sh, 检查后将结果用MQTT上报
+
+6）由于 isgservicemonitor ，做了与runit相互保全的工作，isgservicemonitor 也会每隔一段时间检查 rundir有没有起来，为了避免重复启用runit，在确保 runit 正常运行里，启动runsvdir -P /data/data/com.termux/files/usr/etc/service &之前需要提前判断 isgservicemonitor是否在运行
+
+7）把autocheckall里涉及到所有的mqtt消息汇总一下，放在文档最后面
 
