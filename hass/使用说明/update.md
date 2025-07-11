@@ -8,6 +8,7 @@
 > * 手动或自动更新 Home Assistant 版本
 > * 支持升级和降级
 
+2025.7.1, 升级依赖 pip install click==8.1.7
 ---
 
 ### 1. 功能概览
@@ -135,6 +136,7 @@ python -m ensurepip --upgrade
 
 log_step "升级 pip"
 pip install --upgrade pip
+pip install click==8.1.7
 
 log_step "升级 Home Assistant 到 2025.7.1"
 pip install --upgrade homeassistant==2025.7.1
