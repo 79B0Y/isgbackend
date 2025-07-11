@@ -101,6 +101,7 @@
 > * 日志: 所有输出写入独立日志，日志存入/data/data/com.termux/files/home/servicemanager/<service_id>/logs/<script>.log, 保存最近500条
 > * MQTT上报：通过termux Mosquitto cli 上报 MQTT，主题：isg/backup/hass/status `backuping` → `success` / `failed`
 > * MQTT broker：登陆信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml 获取
+> * 错误消息：通过MQTT message上报，message为英文
 > * 自动清理：保留最新 **3** 份备份
 > * 备份文件示例：
 ```
