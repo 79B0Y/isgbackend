@@ -8,6 +8,9 @@
 > * Termux + Proot Ubuntu
 > * Home Assistant 数据还原操作
 
+指定还原
+RESTORE_FILE=/sdcard/isgbackup/hass/specific_backup.zip bash restore.sh
+
 ---
 
 ### 1. 功能概览
