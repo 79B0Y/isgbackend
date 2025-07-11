@@ -103,6 +103,7 @@
 > * MQTT broker：登陆信息从 /data/data/com.termux/files/home/servicemanager/configuration.yaml 获取
 > * 错误消息：通过MQTT message上报，message为英文
 > * 自动清理：保留最新 **3** 份备份
+> * 开始启动backup时需要上报状态 running
 > * 备份文件示例：
 ```
 /sdcard/isgbackup/hass/homeassistant_backup_20250710-015230.tar.gz
