@@ -4,7 +4,7 @@
 
 ---
 
-### 1) 确保 runit 正常运行
+### ὓ9 1) 确保 runit 正常运行
 
 #### ✅ 步骤
 
@@ -68,7 +68,7 @@
 
 ---
 
-### 2) 确认 runsv 是否监控重要服务
+### ὓ9 2) 确认 runsv 是否监控重要服务
 
 #### ✅ 目标服务：
 
@@ -96,7 +96,7 @@ sv status mysqld
 
 ---
 
-### 3) 确保 isgservicemonitor 服务启动和安装
+### ὓ9 3) 确保 isgservicemonitor 服务启动和安装
 
 #### ✅ 步骤
 
@@ -159,7 +159,7 @@ done
 
 ---
 
-### 4) 确认 isgservicemonitor 服务最终状态
+### ὓ9 4) 确认 isgservicemonitor 服务最终状态
 
 ```bash
 sv status isgservicemonitor
@@ -174,32 +174,45 @@ sv status isgservicemonitor
   "uptime": "120s"
 }
 ```
-5) 各服务子系统可用性自检
+
+---
+
+### ὓ9 5) 各服务子系统可用性自检（并赋予权限）
 
 在 isgservicemonitor 成功启动后，自动调用各个服务的自检脚本，以验证其独立可用性：
 
-✅ 检查流程：
+#### ✅ 检查流程：
 
-遍历服务子系统目录（例如 servicemanager 下的各模块）：
+0. **为所有 autocheck.sh 赋可执行权限**：
 
+```bash
+find /data/data/com.termux/files/home/servicemanager -type f -name 'autocheck.sh' -exec chmod +x {} \;
+```
+
+1. 遍历服务子系统目录（例如 servicemanager 下的各模块）：
+
+```bash
 for service in /data/data/com.termux/files/usr/servicemanager/*; do
     [ -f "$service/autocheck.sh" ] && bash "$service/autocheck.sh"
     # 建议每个 autocheck.sh 内部自行处理 MQTT 上报
 done
+```
 
-每个 <service_id>/autocheck.sh 自检脚本应实现：
+2. 每个 `<service_id>/autocheck.sh` 自检脚本应实现：
 
-启动状态验证（端口/进程/功能）
+   * 启动状态验证（端口/进程/功能）
+   * 输出标准 MQTT 上报，如：
 
-输出标准 MQTT 上报，如：
+     ```json
+     isg/service/<service_id>/status {
+       "status": "ok" | "failed",
+       "detail": "port open, mqtt connected..."
+     }
+     ```
 
-isg/service/<service_id>/status {
-  "status": "ok" | "failed",
-  "detail": "port open, mqtt connected..."
-}
+3. 示例目录结构：
 
-示例目录结构：
-
+```
 servicemanager/
 ├── hass/
 │   └── autocheck.sh
@@ -207,8 +220,20 @@ servicemanager/
 │   └── autocheck.sh
 └── z2m/
     └── autocheck.sh
+```
 
-建议统一封装 MQTT 上报工具函数 mqtt_report <topic> <json_payload> 供所有 autocheck.sh 使用。
+4. 建议统一封装 MQTT 上报工具函数 `mqtt_report <topic> <json_payload>` 供所有 autocheck.sh 使用。
+
+---
+
+### ✨ 可选扩展：
+
+* 封装为函数 `check_runit()` `check_isg()` 方便重用
+* 实现 MQTT 日志推送函数 `mqtt_report <topic> <payload>`
+* 在 `.bashrc` 中加入 runsvdir 自启控制
+
+---
+
 
 
 
