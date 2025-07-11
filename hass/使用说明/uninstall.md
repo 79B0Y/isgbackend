@@ -88,9 +88,9 @@ mqtt_report "isg/install/hass/status" '{"status": "uninstalled", "message": "Hom
 > `/data/data/com.termux/files/home/servicemanager/hass/uninstall.sh`
 
 > **运行目标**
-# 职责：
-#   1. 调用 stop.sh 停止home assistant
-#   2. 进入proot ubuntu容器，卸载home assistant
+### 职责：
+###  1. 调用 stop.sh 停止home assistant
+###   2. 进入proot ubuntu容器，卸载home assistant
 proot-distro login ubuntu << 'EOF'
 
 log_step() {
@@ -113,8 +113,8 @@ log_step "卸载完成 ✅"
 
 EOF
 
-#   3. 日志: 所有输出写入独立日志，日志存入/data/data/com.termux/files/home/servicemanager/<service_id>/logs/<script>.log, 保存最近500条
-#   4. 创建 .disabled 标志，阻止 autocheck.sh 误重装/重启
-#   5. 通过termux Mosquitto cli 上报 MQTT，主题：isg/install/hass/status uninstalling → uninstalled / failed。
-#。 6. 错误消息：通过MQTT message上报，message为英文
+###   3. 日志: 所有输出写入独立日志，日志存入/data/data/com.termux/files/home/servicemanager/<service_id>/logs/<script>.log, 保存最近500条
+###   4. 创建 .disabled 标志，阻止 autocheck.sh 误重装/重启
+###   5. 通过termux Mosquitto cli 上报 MQTT，主题：isg/install/hass/status uninstalling → uninstalled / failed。
+###   6. 错误消息：通过MQTT message上报，message为英文
 ---
