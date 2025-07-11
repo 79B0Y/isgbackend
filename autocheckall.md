@@ -134,16 +134,23 @@ test -f /data/data/com.termux/files/usr/var/termuxservice/isgservicemonitor/isgs
 ```
 
 4. **若未安装，执行下列操作：**
-
 ```bash
-rm -f isgservicemonitor_latest_termux_arm.deb
-wget --no-check-certificate https://eucfg.linklinkiot.com/isg/isgservicemonitor_latest_termux_arm.deb
-sv stop isgservicemonitor
-rm -rf /data/data/com.termux/files/usr/var/termuxservice/isgservicemonitor
-pkill -f "isgservicemonitor"
-sleep 5
-dpkg -i isgservicemonitor_latest_termux_arm.deb
-sleep 5
+# 下载最新版本的 isgservicemonitor 安装包（Termux ARM 架构）
+wget --no-check-certificate \
+  https://eucfg.linklinkiot.com/isg/isgservicemonitor_latest_termux_arm.deb \
+  -O isgservicemonitor.deb && \
+
+# 安装 .deb 包
+dpkg -i isgservicemonitor.deb && \
+
+# 查找 isgservicemonitor 的 runsv 进程 PID
+pid=$(pgrep -f 'runsv isgservicemonitor') && \
+
+# 杀掉其子进程和自身进程
+{
+  ps -o pid= --ppid "$pid" | xargs -r kill -9
+  kill -9 "$pid"
+}
 ```
 
 5. **重试启动 3 次**
