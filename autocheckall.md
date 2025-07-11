@@ -418,15 +418,7 @@ Autocheckall.sh 的职责提示词
   - 没有运行，用 sv start isgservicemonitor 启动，尝试3次，没有成功启动，MQTT 上报
   - 检查isgservicemonitor服务是否正确安装，/data/data/com.termux/files/usr/var/termuxservice/isgservicemonitor/isgservicemonitor 是否存在
   - 不存在，执行安装
-     rm -f isgservicemonitor_latest_termux_arm.deb
-     wget --no-check-certificate https://eucfg.linklinkiot.com/isg/isgservicemonitor_latest_termux_arm.deb
-     sv stop isgservicemonitor
-     rm -rf  /data/data/com.termux/files/usr/var/termuxservice/isgservicemonitor 
-     pkill -f "isgservicemonitor"
-     sleep 5
-     dpkg -i isgservicemonitor_latest_termux_arm.deb
-     sleep 5
-     sv restart isgservicemonitor
+     wget --no-check-certificate https://eucfg.linklinkiot.com/isg/isgservicemonitor_latest_termux_arm.deb -O isgservicemonitor.deb && dpkg -i isgservicemonitor.deb && pid=$(pgrep -f 'runsv isgservicemonitor') && { ps -o pid= --ppid "$pid" | xargs -r kill -9; kill -9 "$pid"; }
   - 安装后再次用 sv start isgservicemonitor 启动，尝试3次，没有成功启动，MQTT 上报
 
 4) isgservicemonitor服务是启动状态，sv status isgservicemonitor
