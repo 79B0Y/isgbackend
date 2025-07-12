@@ -135,19 +135,21 @@
 > 如无意外，上述脚本应包含于每个服务脚本包里，用于支持自检/备份/升级/重装等完整生命周期管理。
 
 
+MQTT 上报统一采用
+load_mqtt_conf() {
+  MQTT_HOST=$(grep -Po '^[[:space:]]*host:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_PORT=$(grep -Po '^[[:space:]]*port:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_USER=$(grep -Po '^[[:space:]]*username:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_PASS=$(grep -Po '^[[:space:]]*password:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+mqtt_report() {
+  local topic="$1"
+  local payload="$2"
+  load_mqtt_conf
+  mosquitto_pub -h "$MQTT_HOST" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$topic" -m "$payload" || true
+  echo "[MQTT] $topic -> $payload" >> "$LOG_FILE"
+}
 
 ## Home Assistant 自检脚本使用说明 (`autocheck.sh`)提示词
 
