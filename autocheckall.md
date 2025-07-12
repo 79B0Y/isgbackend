@@ -3,6 +3,9 @@
 本文是 Termux 环境下自动检查 runit 和 isgservicemonitor 服务运行状态的脚本设计规范，包括 MQTT 状态上报、故障恢复以及服务自动重启。
 
 ---
+安装相关依赖
+pkg install netcat-openbsd
+
 
 ### ὓ9 1) 确保 runit 正常运行
 
