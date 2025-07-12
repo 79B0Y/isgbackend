@@ -103,6 +103,25 @@ EOF
 > 推荐配合 `autocheck.sh` 自动检测 + 更新，或系统升级前手动执行
 
 
+MQTT 上报统一采用
+load_mqtt_conf() {
+  MQTT_HOST=$(grep -Po '^[[:space:]]*host:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_PORT=$(grep -Po '^[[:space:]]*port:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_USER=$(grep -Po '^[[:space:]]*username:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+  MQTT_PASS=$(grep -Po '^[[:space:]]*password:[[:space:]]*\K.*' "$CONFIG_FILE" | head -n1)
+}
+
+mqtt_report() {
+  local topic="$1"
+  local payload="$2"
+  load_mqtt_conf
+  mosquitto_pub -h "$MQTT_HOST" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "$topic" -m "$payload" || true
+  echo "[MQTT] $topic -> $payload" >> "$LOG_FILE"
+}
+
+
+
+
 
 ## Home Assistant 升级脚本使用说明 (`update.sh`)提示词
 
