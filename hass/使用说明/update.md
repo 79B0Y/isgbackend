@@ -7,6 +7,11 @@
 >
 > * 手动或自动更新 Home Assistant 版本
 > * 支持升级和降级
+>
+### 升级方法
+EXTRA_PIP_PKGS="click==8.1.7" TARGET_VERSION=2025.7.1 bash update.sh
+指定升级依赖：EXTRA_PIP_PKGS="click==8.1.7"
+指定升级版本：TARGET_VERSION=2025.7.1
 
 2025.7.1, 升级依赖 pip install click==8.1.7
 ---
