@@ -5,7 +5,7 @@
 ---
 安装相关依赖
 pkg install netcat-openbsd
-
+pkg install jq
 
 ### ὓ9 1) 确保 runit 正常运行
 
